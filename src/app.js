@@ -1,7 +1,7 @@
 import express from "express";
 import cors from "cors";
-import authRoutes from "./routes/auth.js";
-import deviceRoutes from "./routes/devices.js";
+import authRoutes from "./routes/authRoutes.js";
+import deviceRoutes from "./routes/devicesRoutes.js";
 
 const app = express();
 app.use(express.json());
