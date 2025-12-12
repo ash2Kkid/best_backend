@@ -1,11 +1,11 @@
 import mongoose from "mongoose";
 
 const sensorDataSchema = new mongoose.Schema({
-  deviceId: String,
-  timestamp: { type: Date, default: Date.now },
-  data: Object
+  deviceId: { type: String, required: true },
+  topic: { type: String },
+  data: { type: Object },
+  timestamp: { type: Date, default: Date.now }
 });
 
-const sensorData = mongoose.model("SensorData", sensorDataSchema);
-
-export default sensorData;
+const SensorData = mongoose.model("SensorData", sensorDataSchema);
+export default SensorData;
