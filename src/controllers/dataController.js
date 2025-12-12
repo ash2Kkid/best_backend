@@ -1,4 +1,4 @@
-const SensorData = require("../models/SensorData");
+import SensorData from "../models/SensorData.js";
 
 export const getDeviceData = async (req, res) => {
   const { deviceId } = req.params;

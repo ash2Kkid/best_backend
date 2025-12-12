@@ -1,7 +1,9 @@
-const router = require("express").Router();
-const auth = require("../middleware/authMiddleware");
-const { getDeviceData } = require("../controllers/dataController");
+import { Router } from "express";
+import { authMiddleware } from "../middleware/authMiddleware.js";
+import { getDeviceData } from "../controllers/dataController.js";
 
-router.get("/:deviceId", auth, getDeviceData);
+const router = Router();
 
-module.exports = router;
+router.get("/:deviceId", authMiddleware, getDeviceData);
+
+export default router;

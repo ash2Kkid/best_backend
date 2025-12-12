@@ -1,4 +1,4 @@
-const Device = require("../models/Device");
+import Device from "../models/Device.js";
 
 export const registerDevice = async (req, res) => {
   const { name, deviceId } = req.body;

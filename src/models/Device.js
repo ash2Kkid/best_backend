@@ -1,4 +1,4 @@
-const mongoose = require("mongoose");
+import mongoose from "mongoose";
 
 const deviceSchema = new mongoose.Schema({
   name: String,
@@ -6,4 +6,6 @@ const deviceSchema = new mongoose.Schema({
   owner: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
 });
 
-module.exports = mongoose.model("Device", deviceSchema);
+const device = mongoose.model("Device", deviceSchema);
+
+export default device;
