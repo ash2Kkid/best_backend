@@ -1,30 +1,43 @@
-require("dotenv").config();
-const express = require("express");
-const cors = require("cors");
+import dotenv from "dotenv";
+dotenv.config();
 
-const connectDB = require("./config/db");
-const mqttClient = require("./config/mqtt");
-const SensorData = require("./models/SensorData");
+import express from "express";
+import cors from "cors";
 
+import connectDB from "./config/db.js";
+import mqttClient from "./config/mqtt.js";
+import SensorData from "./models/SensorData.js";
+
+// MongoDB connection
 connectDB();
 
+// MQTT message handler
 mqttClient.on("message", async (topic, message) => {
-  const deviceId = topic.split("/")[1];
+  try {
+    const deviceId = topic.split("/")[1];
 
-  await SensorData.create({
-    deviceId,
-    data: JSON.parse(message.toString())
-  });
+    await SensorData.create({
+      deviceId,
+      data: JSON.parse(message.toString())
+    });
 
-  console.log("Saved data for device:", deviceId);
+    console.log("Saved data for device:", deviceId);
+  } catch (err) {
+    console.error("Error saving MQTT data:", err.message);
+  }
 });
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 
-app.use("/auth", require("./routes/authRoutes"));
-app.use("/device", require("./routes/deviceRoutes"));
-app.use("/data", require("./routes/dataRoutes"));
+// Routes (add .js extension for ESM)
+import authRoutes from "./routes/authRoutes.js";
+import deviceRoutes from "./routes/deviceRoutes.js";
+import dataRoutes from "./routes/dataRoutes.js";
+
+app.use("/auth", authRoutes);
+app.use("/device", deviceRoutes);
+app.use("/data", dataRoutes);
 
 app.listen(5000, () => console.log("Server running on 5000"));
