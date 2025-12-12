@@ -33,7 +33,7 @@ app.use(express.json());
 
 // Routes (add .js extension for ESM)
 import authRoutes from "./routes/authRoutes.js";
-import deviceRoutes from "./routes/deviceRoutes.js";
+import deviceRoutes from "./routes/devicesRoutes.js";
 import dataRoutes from "./routes/dataRoutes.js";
 
 app.use("/auth", authRoutes);
