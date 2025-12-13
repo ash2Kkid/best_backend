@@ -11,6 +11,10 @@ import devicesRoutes from "./routes/devicesRoutes.js";
 import dataRoutes from "./routes/dataRoutes.js";
 
 import SensorData from "./models/SensorData.js";
+import homeRoutes from "./routes/homeRoutes.js";
+
+
+
 
 const PORT = process.env.PORT || 5000;
 const PREFIX = process.env.PREFIX || "bnest";
@@ -23,6 +27,7 @@ app.use(express.json());
 app.use("/auth", authRoutes);
 app.use("/devices", devicesRoutes);
 app.use("/data", dataRoutes);
+app.use("/api/homes", homeRoutes);
 
 // DB + MQTT init
 connectDB();
