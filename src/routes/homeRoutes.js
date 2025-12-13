@@ -1,6 +1,7 @@
 import express from "express";
 import { createHome, getMyHomes, inviteUser } from "../controllers/homeController.js";
-import { auth } from "../middleware/auth.js";
+import auth from "../middleware/auth.js";
+
 
 const router = express.Router();
 
