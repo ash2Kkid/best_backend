@@ -1,41 +1,35 @@
 import Device from "../models/Device.js";
-import mqttClient from "../config/mqtt.js";
+import Home from "../models/Home.js";
+import crypto from "crypto";
 
 export const registerDevice = async (req, res) => {
-  try {
-    const { name, deviceId } = req.body;
-    const device = await Device.create({ name, deviceId, owner: req.user });
-    res.json(device);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ msg: "Error registering device" });
+  const { homeId, roomId, name, deviceId } = req.body;
+
+  const home = await Home.findById(homeId);
+  if (!home) return res.status(404).json({ msg: "Home not found" });
+
+  if (home.roleMap.get(req.user) !== "ADMIN") {
+    return res.status(403).json({ msg: "Admin only" });
   }
+
+  const deviceSecret = crypto.randomBytes(24).toString("hex");
+
+  const device = await Device.create({
+    home: homeId,
+    room: roomId,
+    name,
+    deviceId,
+    deviceSecret
+  });
+
+  res.status(201).json({
+    deviceId: device.deviceId,
+    deviceSecret
+  });
 };
 
-export const getMyDevices = async (req, res) => {
-  try {
-    const devices = await Device.find({ owner: req.user });
-    res.json(devices);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ msg: "Error fetching devices" });
-  }
-};
-
-export const sendCommand = async (req, res) => {
-  try {
-    const { deviceId, command } = req.body;
-    if (!deviceId || !command) return res.status(400).json({ msg: "Missing deviceId or command" });
-
-    const prefix = process.env.PREFIX || "bnest";
-    const topic = `device/${prefix}/${deviceId}/cmd`;
-    mqttClient.publish(topic, JSON.stringify(command), { qos: 0 }, (err) => {
-      if (err) console.error("MQTT publish error:", err);
-    });
-
-    res.json({ msg: "Command published", topic });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ msg: "Error sending command" });
-  }
+export const getDevicesByHome = async (req, res) => {
+  const { homeId } = req.params;
+  const devices = await Device.find({ home: homeId });
+  res.json(devices);
 };
