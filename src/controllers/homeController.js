@@ -1,19 +1,60 @@
 import Home from "../models/Home.js";
+import User from "../models/User.js";
 
+// Create a new home (Admin only)
 export const createHome = async (req, res) => {
-  const home = await Home.create({
-    name: req.body.name,
-    admin: req.user.id,
-    members: [{ user: req.user.id, role: "ADMIN" }]
-  });
+  try {
+    const { name, location } = req.body;
 
-  res.json(home);
+    const home = await Home.create({
+      name,
+      location,
+      owner: req.user,
+      members: [req.user],
+      roleMap: { [req.user]: "ADMIN" }
+    });
+
+    res.status(201).json(home);
+  } catch (err) {
+    res.status(500).json({ msg: err.message });
+  }
 };
 
-export const myHomes = async (req, res) => {
-  const homes = await Home.find({
-    "members.user": req.user.id
-  });
+// Get all homes for logged-in user
+export const getMyHomes = async (req, res) => {
+  try {
+    const homes = await Home.find({ members: req.user });
+    res.json(homes);
+  } catch (err) {
+    res.status(500).json({ msg: err.message });
+  }
+};
 
-  res.json(homes);
+// Invite a user to home (admin only)
+export const inviteUser = async (req, res) => {
+  try {
+    const { homeId } = req.params;
+    const { email, role } = req.body;
+
+    const home = await Home.findById(homeId);
+    if (!home) return res.status(404).json({ msg: "Home not found" });
+
+    // Check admin rights
+    if (home.roleMap.get(req.user) !== "ADMIN") {
+      return res.status(403).json({ msg: "Not authorized" });
+    }
+
+    const user = await User.findOne({ email });
+    if (!user) return res.status(404).json({ msg: "User not found" });
+
+    if (!home.members.includes(user._id)) {
+      home.members.push(user._id);
+    }
+    home.roleMap.set(user._id.toString(), role || "USER");
+    await home.save();
+
+    res.json({ msg: "User invited", home });
+  } catch (err) {
+    res.status(500).json({ msg: err.message });
+  }
 };

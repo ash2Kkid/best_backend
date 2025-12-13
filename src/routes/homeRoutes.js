@@ -1,10 +1,19 @@
 import express from "express";
-import { auth } from "../middleware/auth.js";
-import { createHome, myHomes } from "../controllers/homeController.js";
+import { createHome, getMyHomes, inviteUser } from "../controllers/homeController.js";
+import authMiddleware from "../middleware/authMiddleware.js";
 
 const router = express.Router();
 
-router.post("/", auth, createHome);
-router.get("/my", auth, myHomes);
+// All routes require JWT auth
+router.use(authMiddleware);
+
+// Create a home (Admin)
+router.post("/", createHome);
+
+// Fetch homes for logged-in user
+router.get("/my", getMyHomes);
+
+// Invite a user to home
+router.post("/:homeId/invite", inviteUser);
 
 export default router;

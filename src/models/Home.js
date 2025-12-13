@@ -1,18 +1,11 @@
 import mongoose from "mongoose";
 
-const homeSchema = new mongoose.Schema({
+const HomeSchema = new mongoose.Schema({
   name: { type: String, required: true },
-  admin: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: "User",
-    required: true
-  },
-  members: [
-    {
-      user: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
-      role: { type: String, enum: ["ADMIN", "USER"], default: "USER" }
-    }
-  ]
-});
+  location: { type: String },
+  owner: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
+  members: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
+  roleMap: { type: Map, of: String }, // userId -> role: ADMIN | USER
+}, { timestamps: true });
 
-export default mongoose.model("Home", homeSchema);
+export default mongoose.model("Home", HomeSchema);
