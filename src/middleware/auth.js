@@ -1,13 +1,23 @@
 import jwt from "jsonwebtoken";
 
-export const auth = (req, res, next) => {
-  const token = req.headers.authorization?.split(" ")[1];
-  if (!token) return res.sendStatus(401);
+export default function auth(req, res, next) {
+  const authHeader = req.headers.authorization;
+
+  if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    return res.status(401).json({ msg: "No token" });
+  }
+
+  const token = authHeader.split(" ")[1];
 
   try {
-    req.user = jwt.verify(token, process.env.JWT_SECRET);
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+
+    // 🔑 IMPORTANT FIX:
+    // store ONLY the user ID, not the whole JWT payload
+    req.user = decoded.id;
+
     next();
-  } catch {
-    res.sendStatus(401);
+  } catch (err) {
+    return res.status(401).json({ msg: "Invalid token" });
   }
-};
+}
