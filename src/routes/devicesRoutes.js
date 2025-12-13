@@ -3,7 +3,7 @@ import auth from "../middleware/auth.js";
 import {
   registerDevice,
   getDevicesByHome
-} from "../controllers/devicesController.js";
+} from "../controllers/deviceController.js";
 
 const router = express.Router();
 router.use(auth);
