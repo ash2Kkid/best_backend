@@ -16,8 +16,8 @@ export default function auth(req, res, next) {
     console.log("DECODED JWT:", decoded);
 
     // 🔑 IMPORTANT FIX:
-    // store ONLY the user ID, not the whole JWT payload
-    req.user = decoded.id;
+    // store the full decoded JWT instead of just the ID
+    req.user = decoded;
 
     next();
   } catch (err) {
