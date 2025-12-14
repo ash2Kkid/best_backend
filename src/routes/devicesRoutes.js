@@ -14,4 +14,7 @@ router.post("/", registerDevice);
 // Get devices belonging to a home
 router.get("/:homeId", getDevicesByHome);
 
+router.post("/cmd", auth, sendCommand);
+
+
 export default router;
