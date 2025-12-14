@@ -8,7 +8,7 @@ import {
   deleteUser,
 } from "../controllers/adminController.js";
 import {
-    getAllHomes,
+    getMyHomes,
     createHome,
     updateHome,
     deleteHome,
@@ -23,7 +23,7 @@ router.put("/users/:userId", auth, adminOnly, updateUser);
 router.delete("/users/:userId", auth, adminOnly, deleteUser);
 
 // Homes CRUD (admin only)
-router.get("/homes", auth, adminOnly, getAllHomes);
+router.get("/homes", auth, adminOnly, getMyHomes);
 router.post("/homes", auth, adminOnly, createHome);
 router.put("/homes/:homeId", auth, adminOnly, updateHome);
 router.delete("/homes/:homeId", auth, adminOnly, deleteHome);
