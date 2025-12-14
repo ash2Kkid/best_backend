@@ -9,36 +9,12 @@ export const createHome = async (req, res) => {
     const home = await Home.create({
       name,
       location,
-      owner: req.user.id,          // use only ID
+      owner: req.user.id,          // Use only ID
       members: [req.user.id],      // array of IDs
       roleMap: { [req.user.id]: "ADMIN" } // key = user ID
     });
 
     res.status(201).json(home);
-  } catch (err) {
-    res.status(500).json({ msg: err.message });
-  }
-};
-
-// Update the Home
-export const updateHome = async (req, res) => {
-  try {
-    const { homeId } = req.params;
-    const { name, location } = req.body;
-
-    const home = await Home.findById(homeId);
-    if (!home) return res.status(404).json({ msg: "Home not found" });
-
-    // Admin check
-    if (home.roleMap.get(req.user) !== "ADMIN") {
-      return res.status(403).json({ msg: "Not authorized" });
-    }
-
-    if (name) home.name = name;
-    if (location) home.location = location;
-
-    await home.save();
-    res.json({ msg: "Home updated", home });
   } catch (err) {
     res.status(500).json({ msg: err.message });
   }
@@ -54,7 +30,50 @@ export const getMyHomes = async (req, res) => {
   }
 };
 
-// Invite a user to home (admin only)
+// Update home (Admin only)
+export const updateHome = async (req, res) => {
+  try {
+    const { homeId } = req.params;
+    const { name, location } = req.body;
+
+    const home = await Home.findById(homeId);
+    if (!home) return res.status(404).json({ msg: "Home not found" });
+
+    // Admin check using user ID
+    if (home.roleMap.get(req.user.id) !== "ADMIN") {
+      return res.status(403).json({ msg: "Not authorized" });
+    }
+
+    if (name) home.name = name;
+    if (location) home.location = location;
+
+    await home.save();
+    res.json({ msg: "Home updated", home });
+  } catch (err) {
+    res.status(500).json({ msg: err.message });
+  }
+};
+
+// Delete home (Admin only)
+export const deleteHome = async (req, res) => {
+  try {
+    const { homeId } = req.params;
+    const home = await Home.findById(homeId);
+    if (!home) return res.status(404).json({ msg: "Home not found" });
+
+    // Admin check using user ID
+    if (home.roleMap.get(req.user.id) !== "ADMIN") {
+      return res.status(403).json({ msg: "Not authorized" });
+    }
+
+    await home.remove();
+    res.json({ msg: "Home deleted" });
+  } catch (err) {
+    res.status(500).json({ msg: err.message });
+  }
+};
+
+// Invite a user to home (Admin only)
 export const inviteUser = async (req, res) => {
   try {
     const { homeId } = req.params;
@@ -63,7 +82,7 @@ export const inviteUser = async (req, res) => {
     const home = await Home.findById(homeId);
     if (!home) return res.status(404).json({ msg: "Home not found" });
 
-    // Check admin rights
+    // Admin check using user ID
     if (home.roleMap.get(req.user.id) !== "ADMIN") {
       return res.status(403).json({ msg: "Not authorized" });
     }
@@ -80,19 +99,5 @@ export const inviteUser = async (req, res) => {
     res.json({ msg: "User invited", home });
   } catch (err) {
     res.status(500).json({ msg: err.message });
-  }
-};
-
-
-// Delete home
-export const deleteHome = async (req, res) => {
-  try {
-    const { homeId } = req.params;
-    const home = await Home.findByIdAndDelete(homeId);
-    if (!home) return res.status(404).json({ msg: "Home not found" });
-    res.json({ msg: "Home deleted" });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ msg: "Failed to delete home" });
   }
 };
