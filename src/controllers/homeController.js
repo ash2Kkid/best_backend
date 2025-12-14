@@ -20,6 +20,30 @@ export const createHome = async (req, res) => {
   }
 };
 
+// Update the Home
+export const updateHome = async (req, res) => {
+  try {
+    const { homeId } = req.params;
+    const { name, location } = req.body;
+
+    const home = await Home.findById(homeId);
+    if (!home) return res.status(404).json({ msg: "Home not found" });
+
+    // Admin check
+    if (home.roleMap.get(req.user) !== "ADMIN") {
+      return res.status(403).json({ msg: "Not authorized" });
+    }
+
+    if (name) home.name = name;
+    if (location) home.location = location;
+
+    await home.save();
+    res.json({ msg: "Home updated", home });
+  } catch (err) {
+    res.status(500).json({ msg: err.message });
+  }
+};
+
 // Get all homes for logged-in user
 export const getMyHomes = async (req, res) => {
   try {
