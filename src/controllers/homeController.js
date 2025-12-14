@@ -82,3 +82,17 @@ export const inviteUser = async (req, res) => {
     res.status(500).json({ msg: err.message });
   }
 };
+
+
+// Delete home
+export const deleteHome = async (req, res) => {
+  try {
+    const { homeId } = req.params;
+    const home = await Home.findByIdAndDelete(homeId);
+    if (!home) return res.status(404).json({ msg: "Home not found" });
+    res.json({ msg: "Home deleted" });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ msg: "Failed to delete home" });
+  }
+};
