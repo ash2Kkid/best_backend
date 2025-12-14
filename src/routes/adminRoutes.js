@@ -7,6 +7,12 @@ import {
   updateUser,
   deleteUser,
 } from "../controllers/adminController.js";
+import {
+    getAllHomes,
+    createHome,
+    updateHome,
+    deleteHome,
+} from "../controllers/homeController.js";
 
 const router = Router();
 
