@@ -9,9 +9,9 @@ export const createHome = async (req, res) => {
     const home = await Home.create({
       name,
       location,
-      owner: req.user,
-      members: [req.user],
-      roleMap: { [req.user]: "ADMIN" }
+      owner: req.user.id,          // use only ID
+      members: [req.user.id],      // array of IDs
+      roleMap: { [req.user.id]: "ADMIN" } // key = user ID
     });
 
     res.status(201).json(home);
@@ -47,7 +47,7 @@ export const updateHome = async (req, res) => {
 // Get all homes for logged-in user
 export const getMyHomes = async (req, res) => {
   try {
-    const homes = await Home.find({ members: req.user });
+    const homes = await Home.find({ members: req.user.id });
     res.json(homes);
   } catch (err) {
     res.status(500).json({ msg: err.message });
@@ -64,7 +64,7 @@ export const inviteUser = async (req, res) => {
     if (!home) return res.status(404).json({ msg: "Home not found" });
 
     // Check admin rights
-    if (home.roleMap.get(req.user) !== "ADMIN") {
+    if (home.roleMap.get(req.user.id) !== "ADMIN") {
       return res.status(403).json({ msg: "Not authorized" });
     }
 
