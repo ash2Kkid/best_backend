@@ -58,15 +58,17 @@ export const updateHome = async (req, res) => {
 export const deleteHome = async (req, res) => {
   try {
     const { homeId } = req.params;
+
     const home = await Home.findById(homeId);
     if (!home) return res.status(404).json({ msg: "Home not found" });
 
-    // Admin check using user ID
+    // Admin check
     if (home.roleMap.get(req.user.id) !== "ADMIN") {
       return res.status(403).json({ msg: "Not authorized" });
     }
 
-    await home.remove();
+    await Home.findByIdAndDelete(homeId); // ✅
+
     res.json({ msg: "Home deleted" });
   } catch (err) {
     res.status(500).json({ msg: err.message });
