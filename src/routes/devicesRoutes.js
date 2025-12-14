@@ -2,7 +2,9 @@ import express from "express";
 import auth from "../middleware/auth.js";
 import {
   registerDevice,
-  getDevicesByHome
+  getDevicesByHome,
+  sendCommand
+
 } from "../controllers/deviceController.js";
 
 const router = express.Router();
