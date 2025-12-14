@@ -12,6 +12,9 @@ export default function auth(req, res, next) {
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
+    // 🔑 DEBUG: print decoded JWT
+    console.log("DECODED JWT:", decoded);
+
     // 🔑 IMPORTANT FIX:
     // store ONLY the user ID, not the whole JWT payload
     req.user = decoded.id;
