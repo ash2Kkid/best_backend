@@ -31,7 +31,7 @@ const router = Router();
 
 // Admin-only users CRUD
 router.get("/users", auth, adminOnly, getAllUsers);
-router.get("/users/hierarchy", auth, adminOnly, getUsersWithHomes);
+router.get("/users/full", auth, adminOnly, getUsersWithHomes);
 router.post("/users", auth, adminOnly, createUser);
 router.put("/users/:userId", auth, adminOnly, updateUser);
 router.delete("/users/:userId", auth, adminOnly, deleteUser);
