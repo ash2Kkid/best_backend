@@ -56,18 +56,15 @@ export const getDevicesByRoom = async (req, res) => {
   try {
     const { roomId } = req.params;
 
-    if (!mongoose.Types.ObjectId.isValid(roomId)) {
-      return res.status(400).json({ msg: "Invalid roomId" });
+    if (!roomId) {
+      return res.status(400).json({ msg: "roomId is required" });
     }
 
-    const devices = await Device.find({
-      room: roomId,
-      isActive: true
-    });
+    const devices = await Device.find({ room: roomId });
 
     res.json(devices);
   } catch (err) {
-    console.error("GET DEVICES ERROR:", err);
+    console.error("getDevicesByRoom error:", err);
     res.status(500).json({ msg: err.message });
   }
 };

@@ -17,11 +17,6 @@ import adminRoutes from "./routes/adminRoutes.js";
 
 
 
-
-
-
-
-
 const PORT = process.env.PORT || 5000;
 const PREFIX = process.env.PREFIX || "bnest";
 
