@@ -3,6 +3,7 @@ import auth from "../middleware/auth.js";
 import adminOnly from "../middleware/adminOnly.js";
 import {
   getAllUsers,
+  getUsersWithHomes,
   createUser,
   updateUser,
   deleteUser,
@@ -30,6 +31,7 @@ const router = Router();
 
 // Admin-only users CRUD
 router.get("/users", auth, adminOnly, getAllUsers);
+router.get("/users/hierarchy", auth, adminOnly, getUsersWithHomes);
 router.post("/users", auth, adminOnly, createUser);
 router.put("/users/:userId", auth, adminOnly, updateUser);
 router.delete("/users/:userId", auth, adminOnly, deleteUser);
@@ -53,6 +55,8 @@ router.delete("/devices/:deviceId", auth, adminOnly, deleteDevice);
 router.get("/rooms/:roomId/devices", auth, adminOnly, getDevicesByRoom);
 
 export default router;
+
+
 
 
 

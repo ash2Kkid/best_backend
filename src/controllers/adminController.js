@@ -1,7 +1,11 @@
 import User from "../models/User.js";
 import bcrypt from "bcryptjs";
+import Home from "../models/Home.js";
+import Room from "../models/Room.js";
+import Device from "../models/Device.js";
 
-// Get all users (only role = USER)
+// --- Existing CRUD functions ---
+
 export const getAllUsers = async (req, res) => {
   try {
     const users = await User.find({ role: "USER" }).select("email role");
@@ -12,12 +16,9 @@ export const getAllUsers = async (req, res) => {
   }
 };
 
-// Create new user
 export const createUser = async (req, res) => {
   try {
     const { email, password } = req.body;
-
-    // Check if user exists
     const existing = await User.findOne({ email });
     if (existing) return res.status(400).json({ msg: "User already exists" });
 
@@ -31,7 +32,6 @@ export const createUser = async (req, res) => {
   }
 };
 
-// Update user
 export const updateUser = async (req, res) => {
   try {
     const { userId } = req.params;
@@ -51,17 +51,46 @@ export const updateUser = async (req, res) => {
   }
 };
 
-// Delete user
 export const deleteUser = async (req, res) => {
   try {
     const { userId } = req.params;
-
     const user = await User.findByIdAndDelete(userId);
     if (!user) return res.status(404).json({ msg: "User not found" });
-
     res.json({ msg: "User deleted" });
   } catch (err) {
     console.error(err);
     res.status(500).json({ msg: "Failed to delete user" });
+  }
+};
+
+// --- New API: Users with Homes, Rooms, Devices ---
+export const getUsersWithHomes = async (req, res) => {
+  try {
+    const users = await User.find({ role: "USER" }).lean();
+    const result = [];
+
+    for (const user of users) {
+      const homes = await Home.find({ members: user._id }).lean();
+      const homesWithRoomsAndDevices = [];
+
+      for (const home of homes) {
+        const rooms = await Room.find({ home: home._id }).lean();
+        const roomsWithDevices = [];
+
+        for (const room of rooms) {
+          const devices = await Device.find({ room: room._id }).lean();
+          roomsWithDevices.push({ ...room, devices });
+        }
+
+        homesWithRoomsAndDevices.push({ ...home, rooms: roomsWithDevices });
+      }
+
+      result.push({ ...user, homes: homesWithRoomsAndDevices });
+    }
+
+    res.json(result);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ msg: err.message });
   }
 };
