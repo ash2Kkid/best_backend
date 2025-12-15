@@ -13,6 +13,12 @@ import {
     updateHome,
     deleteHome,
 } from "../controllers/homeController.js";
+import {
+  createRoom,
+  getRoomsByHome,
+  updateRoom,
+  deleteRoom
+} from "../controllers/roomController.js";
 
 const router = Router();
 
@@ -28,4 +34,17 @@ router.post("/homes", auth, adminOnly, createHome);
 router.put("/homes/:homeId", auth, adminOnly, updateHome);
 router.delete("/homes/:homeId", auth, adminOnly, deleteHome);
 
+// Rooms CRUD (admin only)
+router.post("/homes/:homeId/rooms", auth,adminOnly, createRoom);
+router.put("/rooms/:roomId", auth, adminOnly, updateRoom);
+router.delete("/rooms/:roomId", auth, adminOnly, deleteRoom);
+router.get("/homes/:homeId/rooms", auth, adminOnly, getRoomsByHome);
+
 export default router;
+
+
+
+
+
+
+
