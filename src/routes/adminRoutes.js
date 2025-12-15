@@ -19,6 +19,12 @@ import {
   updateRoom,
   deleteRoom
 } from "../controllers/roomController.js";
+import {
+  registerDevice,
+  updateDevice,
+  deleteDevice,
+  getDevicesByRoom
+} from "../controllers/deviceController.js";
 
 const router = Router();
 
@@ -40,7 +46,15 @@ router.put("/rooms/:roomId", auth, adminOnly, updateRoom);
 router.delete("/rooms/:roomId", auth, adminOnly, deleteRoom);
 router.get("/homes/:homeId/rooms", auth, adminOnly, getRoomsByHome);
 
+// Devices CRUD (admin only)
+router.post("/devices", auth, adminOnly, registerDevice);
+router.put("/devices/:deviceId", auth, adminOnly, updateDevice);
+router.delete("/devices/:deviceId", auth, adminOnly, deleteDevice);
+router.get("/rooms/:roomId", auth, adminOnly, getDevicesByRoom);
+
 export default router;
+
+
 
 
 

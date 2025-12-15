@@ -1,22 +1,13 @@
-import express from "express";
+import { Router } from "express";
 import auth from "../middleware/auth.js";
 import {
-  registerDevice,
-  getDevicesByHome,
+  getDevicesByRoom,
   sendCommand
-
 } from "../controllers/deviceController.js";
 
-const router = express.Router();
-router.use(auth);
+const router = Router();
 
-// Admin registers a device for a home/room
-router.post("/", registerDevice);
-
-// Get devices belonging to a home
-router.get("/:homeId", getDevicesByHome);
-
+router.get("/rooms/:roomId", auth, getDevicesByRoom);
 router.post("/cmd", auth, sendCommand);
-
 
 export default router;

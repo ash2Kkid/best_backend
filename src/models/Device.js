@@ -1,19 +1,30 @@
 import mongoose from "mongoose";
 
-const DeviceSchema = new mongoose.Schema({
-  home: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: "Home",
-    required: true
-  },
-  room: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: "Room"
-  },
-  name: String,
-  deviceId: { type: String, unique: true },
-  deviceSecret: String,
-  online: { type: Boolean, default: false }
-}, { timestamps: true });
+const deviceSchema = new mongoose.Schema(
+  {
+    deviceId: { type: String, unique: true, required: true },
+    name: { type: String, required: true },
 
-export default mongoose.model("Device", DeviceSchema);
+    home: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Home",
+      required: true
+    },
+    room: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Room",
+      required: true
+    },
+
+    deviceSecret: { type: String, required: true },
+    isActive: { type: Boolean, default: true },
+
+    meta: {
+      type: Object,
+      default: {}
+    }
+  },
+  { timestamps: true }
+);
+
+export default mongoose.model("Device", deviceSchema);
