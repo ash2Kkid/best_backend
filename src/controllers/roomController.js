@@ -88,13 +88,22 @@ export const deleteRoom = async (req, res) => {
     if (!room) return res.status(404).json({ msg: "Room not found" });
 
     const home = await Home.findById(room.home);
+    if (!home) return res.status(404).json({ msg: "Home not found" });
+
+    // 🔐 Admin check
     if (home.roleMap.get(req.user.id) !== "ADMIN") {
       return res.status(403).json({ msg: "Admins only" });
     }
 
+    // 🧹 DELETE DEVICES FIRST
+    await Device.deleteMany({ room: roomId });
+
+    // 🧹 DELETE ROOM
     await Room.findByIdAndDelete(roomId);
-    res.json({ msg: "Room deleted" });
+
+    res.json({ msg: "Room and its devices deleted" });
   } catch (err) {
     res.status(500).json({ msg: err.message });
   }
 };
+

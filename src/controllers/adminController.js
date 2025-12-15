@@ -8,7 +8,30 @@ import Device from "../models/Device.js";
 
 export const getAllUsers = async (req, res) => {
   try {
-    const users = await User.find({ role: "USER" }).select("email role");
+    const populateHomes = req.query.populateHomes === "true";
+
+    let users;
+
+    if (populateHomes) {
+      users = await User.find({ role: "USER" }).lean();
+
+      const homes = await Home.find({
+        members: { $in: users.map(u => u._id) }
+      }).select("name members");
+
+      users = users.map(user => {
+        const userHomes = homes.filter(h =>
+          h.members.some(m => m.toString() === user._id.toString())
+        );
+        return {
+          ...user,
+          homes: userHomes.map(h => ({ _id: h._id, name: h.name }))
+        };
+      });
+    } else {
+      users = await User.find({ role: "USER" }).select("email role");
+    }
+
     res.json(users);
   } catch (err) {
     console.error(err);

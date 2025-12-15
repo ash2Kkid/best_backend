@@ -67,14 +67,26 @@ export const deleteHome = async (req, res) => {
     const home = await Home.findById(homeId);
     if (!home) return res.status(404).json({ msg: "Home not found" });
 
-    // Admin check
+    // 🔐 Admin check
     if (home.roleMap.get(req.user.id) !== "ADMIN") {
-      return res.status(403).json({ msg: "Not authorized" });
+      return res.status(403).json({ msg: "Admins only" });
     }
 
-    await Home.findByIdAndDelete(homeId); // ✅
+    // 🔎 Get rooms
+    const rooms = await Room.find({ home: homeId }).select("_id");
 
-    res.json({ msg: "Home deleted" });
+    const roomIds = rooms.map(r => r._id);
+
+    // 🧹 DELETE DEVICES
+    await Device.deleteMany({ room: { $in: roomIds } });
+
+    // 🧹 DELETE ROOMS
+    await Room.deleteMany({ home: homeId });
+
+    // 🧹 DELETE HOME
+    await Home.findByIdAndDelete(homeId);
+
+    res.json({ msg: "Home, rooms and devices deleted" });
   } catch (err) {
     res.status(500).json({ msg: err.message });
   }
