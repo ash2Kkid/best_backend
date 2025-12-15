@@ -50,7 +50,7 @@ router.get("/homes/:homeId/rooms", auth, adminOnly, getRoomsByHome);
 router.post("/devices", auth, adminOnly, registerDevice);
 router.put("/devices/:deviceId", auth, adminOnly, updateDevice);
 router.delete("/devices/:deviceId", auth, adminOnly, deleteDevice);
-router.get("/rooms/:roomId", auth, adminOnly, getDevicesByRoom);
+router.get("/rooms/:roomId/devices", auth, adminOnly, getDevicesByRoom);
 
 export default router;
 

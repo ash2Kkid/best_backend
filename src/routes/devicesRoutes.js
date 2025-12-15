@@ -7,6 +7,7 @@ import {
 
 const router = Router();
 
+
 router.get("/rooms/:roomId", auth, getDevicesByRoom);
 router.post("/cmd", auth, sendCommand);
 
