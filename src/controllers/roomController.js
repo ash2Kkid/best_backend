@@ -39,7 +39,7 @@ export const getRoomsByHome = async (req, res) => {
     const home = await Home.findById(homeId);
     if (!home) return res.status(404).json({ msg: "Home not found" });
 
-    if (!home.members.includes(req.user.id)) {
+    if (!home.members.some(m => m.toString() === req.user.id)) {
       return res.status(403).json({ msg: "Access denied" });
     }
 

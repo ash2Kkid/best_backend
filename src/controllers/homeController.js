@@ -4,15 +4,20 @@ import User from "../models/User.js";
 // Create a new home (Admin only)
 export const createHome = async (req, res) => {
   try {
-    const { name, location } = req.body;
+    const { name, location, userId } = req.body; // accept optional userId
 
     const home = await Home.create({
       name,
       location,
-      owner: req.user.id,          // Use only ID
-      members: [req.user.id],      // array of IDs
-      roleMap: { [req.user.id]: "ADMIN" } // key = user ID
+      owner: req.user.id,          // admin is owner
+      members: userId ? [userId] : [req.user.id], // add user if provided
+      roleMap: new Map([[req.user.id, "ADMIN"]])
     });
+
+    // If userId is provided, add them to the roleMap as USER
+    if (userId) home.roleMap.set(userId, "USER");
+
+    await home.save();
 
     res.status(201).json(home);
   } catch (err) {
