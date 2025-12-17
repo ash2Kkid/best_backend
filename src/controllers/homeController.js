@@ -1,15 +1,21 @@
 import Home from "../models/Home.js";
 import User from "../models/User.js";
+import Room from "../models/Room.js";
+import Device from "../models/Device.js";
 
-// Create a new home (Admin only)
+/**
+ * CREATE HOME (Admin only)
+ */
 export const createHome = async (req, res) => {
   try {
     const { name, location, userId } = req.body;
 
-    const members = [req.user.id];
-    const roleMap = new Map([[req.user.id.toString(), "ADMIN"]]);
+    const adminId = req.user.id.toString();
 
-    if (userId) {
+    const members = [adminId];
+    const roleMap = new Map([[adminId, "ADMIN"]]);
+
+    if (userId && userId !== adminId) {
       members.push(userId);
       roleMap.set(userId.toString(), "USER");
     }
@@ -17,7 +23,7 @@ export const createHome = async (req, res) => {
     const home = await Home.create({
       name,
       location,
-      owner: req.user.id,
+      owner: adminId,
       members,
       roleMap
     });
@@ -28,32 +34,56 @@ export const createHome = async (req, res) => {
   }
 };
 
-// Get all homes for logged-in user
+/**
+ * GET HOMES FOR LOGGED-IN USER
+ */
 export const getMyHomes = async (req, res) => {
   try {
-    const homes = await Home.find({ members: req.user.id });
+    const homes = await Home.find({ members: req.user.id.toString() });
     res.json(homes);
   } catch (err) {
     res.status(500).json({ msg: err.message });
   }
 };
 
-// Update home (Admin only)
+/**
+ * UPDATE HOME (Admin only)
+ * ✅ Allows changing assigned USER
+ */
 export const updateHome = async (req, res) => {
   try {
     const { homeId } = req.params;
-    const { name, location } = req.body;
+    const { name, location, userId } = req.body;
+
+    const adminId = req.user.id.toString();
 
     const home = await Home.findById(homeId);
     if (!home) return res.status(404).json({ msg: "Home not found" });
 
-    // Admin check using user ID
-    if (home.roleMap.get(req.user.id) !== "ADMIN") {
-      return res.status(403).json({ msg: "Not authorized" });
+    // 🔐 ADMIN CHECK (FIXED)
+    if (home.roleMap.get(adminId) !== "ADMIN") {
+      return res.status(403).json({ msg: "Admins only" });
     }
 
     if (name) home.name = name;
     if (location) home.location = location;
+
+    // 🔄 UPDATE ASSIGNED USER
+    if (userId) {
+      // Remove all non-admin users
+      home.members = home.members.filter(
+        id => home.roleMap.get(id.toString()) === "ADMIN"
+      );
+
+      // Reset roleMap except admin
+      home.roleMap.forEach((_, key) => {
+        if (key !== adminId) home.roleMap.delete(key);
+      });
+
+      // Add new user
+      home.members.push(userId);
+      home.roleMap.set(userId.toString(), "USER");
+    }
 
     await home.save();
     res.json({ msg: "Home updated", home });
@@ -62,31 +92,28 @@ export const updateHome = async (req, res) => {
   }
 };
 
-// Delete home (Admin only)
+/**
+ * DELETE HOME (Admin only)
+ * ✅ FIXED
+ */
 export const deleteHome = async (req, res) => {
   try {
     const { homeId } = req.params;
+    const adminId = req.user.id.toString();
 
     const home = await Home.findById(homeId);
     if (!home) return res.status(404).json({ msg: "Home not found" });
 
-    // 🔐 Admin check
-    if (home.roleMap.get(req.user.id) !== "ADMIN") {
+    // 🔐 ADMIN CHECK (FIXED)
+    if (home.roleMap.get(adminId) !== "ADMIN") {
       return res.status(403).json({ msg: "Admins only" });
     }
 
-    // 🔎 Get rooms
     const rooms = await Room.find({ home: homeId }).select("_id");
-
     const roomIds = rooms.map(r => r._id);
 
-    // 🧹 DELETE DEVICES
     await Device.deleteMany({ room: { $in: roomIds } });
-
-    // 🧹 DELETE ROOMS
     await Room.deleteMany({ home: homeId });
-
-    // 🧹 DELETE HOME
     await Home.findByIdAndDelete(homeId);
 
     res.json({ msg: "Home, rooms and devices deleted" });
@@ -95,26 +122,30 @@ export const deleteHome = async (req, res) => {
   }
 };
 
-// Invite a user to home (Admin only)
+/**
+ * INVITE USER TO HOME (Admin only)
+ */
 export const inviteUser = async (req, res) => {
   try {
     const { homeId } = req.params;
     const { email, role } = req.body;
 
+    const adminId = req.user.id.toString();
+
     const home = await Home.findById(homeId);
     if (!home) return res.status(404).json({ msg: "Home not found" });
 
-    // Admin check using user ID
-    if (home.roleMap.get(req.user.id) !== "ADMIN") {
-      return res.status(403).json({ msg: "Not authorized" });
+    if (home.roleMap.get(adminId) !== "ADMIN") {
+      return res.status(403).json({ msg: "Admins only" });
     }
 
     const user = await User.findOne({ email });
     if (!user) return res.status(404).json({ msg: "User not found" });
 
-    if (!home.members.includes(user._id)) {
+    if (!home.members.map(String).includes(user._id.toString())) {
       home.members.push(user._id);
     }
+
     home.roleMap.set(user._id.toString(), role || "USER");
     await home.save();
 
