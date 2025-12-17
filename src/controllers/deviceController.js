@@ -6,6 +6,7 @@ import crypto from "crypto";
 import mqttClient from "../config/mqtt.js";
 
 // ADMIN: Register device
+// ADMIN: Register device
 export const registerDevice = async (req, res) => {
   try {
     const { homeId, roomId, name, deviceId } = req.body;
@@ -30,6 +31,13 @@ export const registerDevice = async (req, res) => {
 
     const room = await Room.findById(roomId);
     if (!room) return res.status(404).json({ msg: "Room not found" });
+
+    // 🔒 CRITICAL LINK CHECK (THIS WAS MISSING)
+    if (room.home.toString() !== homeId) {
+      return res
+        .status(400)
+        .json({ msg: "Room does not belong to this home" });
+    }
 
     const deviceSecret = crypto.randomBytes(24).toString("hex");
 

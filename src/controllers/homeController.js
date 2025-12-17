@@ -99,25 +99,31 @@ export const updateHome = async (req, res) => {
 export const deleteHome = async (req, res) => {
   try {
     const { homeId } = req.params;
-    const adminId = req.user.id.toString();
 
     const home = await Home.findById(homeId);
     if (!home) return res.status(404).json({ msg: "Home not found" });
 
-    // 🔐 ADMIN CHECK (FIXED)
-    if (home.roleMap.get(adminId) !== "ADMIN") {
-      return res.status(403).json({ msg: "Admins only" });
+    if (home.roleMap.get(req.user.id) !== "ADMIN") {
+      return res.status(403).json({ msg: "Not authorized" });
     }
 
+    // 🔥 Get all rooms of this home
     const rooms = await Room.find({ home: homeId }).select("_id");
+
     const roomIds = rooms.map(r => r._id);
 
+    // 🧹 Delete all devices in those rooms
     await Device.deleteMany({ room: { $in: roomIds } });
+
+    // 🧹 Delete rooms
     await Room.deleteMany({ home: homeId });
+
+    // 🧹 Delete home
     await Home.findByIdAndDelete(homeId);
 
     res.json({ msg: "Home, rooms and devices deleted" });
   } catch (err) {
+    console.error("DELETE HOME ERROR:", err);
     res.status(500).json({ msg: err.message });
   }
 };
@@ -154,3 +160,5 @@ export const inviteUser = async (req, res) => {
     res.status(500).json({ msg: err.message });
   }
 };
+
+

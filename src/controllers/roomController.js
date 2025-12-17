@@ -1,5 +1,6 @@
 import Room from "../models/Room.js";
 import Home from "../models/Home.js";
+import Device from "../models/Device.js";
 
 /**
  * CREATE ROOM (Admin only)
@@ -10,6 +11,10 @@ export const createRoom = async (req, res) => {
     const { homeId } = req.params;
     const { name } = req.body;
 
+    if (!name || !name.trim()) {
+      return res.status(400).json({ msg: "Room name is required" });
+    }
+
     const home = await Home.findById(homeId);
     if (!home) return res.status(404).json({ msg: "Home not found" });
 
@@ -17,8 +22,20 @@ export const createRoom = async (req, res) => {
       return res.status(403).json({ msg: "Admins only" });
     }
 
+    // 🧠 Prevent duplicate room names inside same home
+    const existing = await Room.findOne({
+      home: homeId,
+      name: name.trim()
+    });
+
+    if (existing) {
+      return res
+        .status(409)
+        .json({ msg: "Room with this name already exists" });
+    }
+
     const room = await Room.create({
-      name,
+      name: name.trim(),
       home: homeId
     });
 
@@ -59,15 +76,34 @@ export const updateRoom = async (req, res) => {
     const { roomId } = req.params;
     const { name } = req.body;
 
+    if (!name || !name.trim()) {
+      return res.status(400).json({ msg: "Room name is required" });
+    }
+
     const room = await Room.findById(roomId);
     if (!room) return res.status(404).json({ msg: "Room not found" });
 
     const home = await Home.findById(room.home);
+    if (!home) return res.status(404).json({ msg: "Home not found" });
+
     if (home.roleMap.get(req.user.id) !== "ADMIN") {
       return res.status(403).json({ msg: "Admins only" });
     }
 
-    room.name = name || room.name;
+    // 🧠 Prevent duplicate name on update
+    const duplicate = await Room.findOne({
+      _id: { $ne: roomId },
+      home: room.home,
+      name: name.trim()
+    });
+
+    if (duplicate) {
+      return res
+        .status(409)
+        .json({ msg: "Another room with this name already exists" });
+    }
+
+    room.name = name.trim();
     await room.save();
 
     res.json(room);
@@ -90,15 +126,14 @@ export const deleteRoom = async (req, res) => {
     const home = await Home.findById(room.home);
     if (!home) return res.status(404).json({ msg: "Home not found" });
 
-    // 🔐 Admin check
     if (home.roleMap.get(req.user.id) !== "ADMIN") {
       return res.status(403).json({ msg: "Admins only" });
     }
 
-    // 🧹 DELETE DEVICES FIRST
+    // 🧹 Cascade delete devices
     await Device.deleteMany({ room: roomId });
 
-    // 🧹 DELETE ROOM
+    // 🧹 Delete room
     await Room.findByIdAndDelete(roomId);
 
     res.json({ msg: "Room and its devices deleted" });
@@ -106,4 +141,3 @@ export const deleteRoom = async (req, res) => {
     res.status(500).json({ msg: err.message });
   }
 };
-
