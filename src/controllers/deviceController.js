@@ -154,3 +154,17 @@ export const sendCommand = async (req, res) => {
   }
 };
 
+export const testDeviceConnection = async (req, res) => {
+  const { deviceId } = req.params;
+
+  const device = await Device.findOne({ deviceId });
+  if (!device) return res.status(404).json({ msg: "Device not found" });
+
+  mqttClient.publish(
+    `device/bnest/${deviceId}/cmd`,
+    JSON.stringify({ command: "ping" })
+  );
+
+  res.json({ msg: "Ping sent to device" });
+};
+
