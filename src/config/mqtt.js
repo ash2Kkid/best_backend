@@ -1,43 +1,67 @@
+import mqtt from "mqtt";
 import Device from "../models/Device.js";
 
-client.on("connect", () => {
-  console.log("MQTT Connected");
+const MQTT_HOST = process.env.MQTT_HOST || "mqtt://broker.hivemq.com";
 
-  // Subscribe to all device status topics
+const options = {};
+if (process.env.MQTT_USERNAME) options.username = process.env.MQTT_USERNAME;
+if (process.env.MQTT_PASSWORD) options.password = process.env.MQTT_PASSWORD;
+
+// Create client
+const client = mqtt.connect(MQTT_HOST, options);
+
+// ---------- CONNECTION ----------
+client.on("connect", () => {
+  console.log("✅ MQTT Connected");
+
+  // Subscribe to device heartbeat topics
   client.subscribe("device/bnest/+/status", (err) => {
-    if (err) console.error("MQTT subscription error:", err);
+    if (err) console.error("❌ MQTT subscription error:", err);
+    else console.log("📡 Subscribed to device status topics");
   });
 });
 
-// Handle incoming messages
+client.on("error", (err) => {
+  console.error("❌ MQTT Error:", err.message);
+});
+
+// ---------- HEARTBEAT HANDLER ----------
 client.on("message", async (topic, message) => {
   try {
     const payload = JSON.parse(message.toString());
 
-    // Only handle heartbeat/status messages
-    if (topic.includes("/status") && payload.deviceId && payload.status) {
-      const isOnline = payload.status === "online";
+    if (!topic.includes("/status")) return;
+    if (!payload.deviceId || !payload.status) return;
 
-      await Device.findOneAndUpdate(
-        { deviceId: payload.deviceId },
-        {
-          isActive: isOnline,
-          lastSeen: isOnline ? new Date() : undefined
-        }
-      );
+    const isOnline = payload.status === "online";
 
-      console.log(`Device ${payload.deviceId} is now ${isOnline ? "online" : "offline"}`);
-    }
+    await Device.findOneAndUpdate(
+      { deviceId: payload.deviceId },
+      {
+        isActive: isOnline,
+        lastSeen: new Date()
+      }
+    );
+
+    console.log(
+      `🟢 Device ${payload.deviceId} → ${isOnline ? "ONLINE" : "OFFLINE"}`
+    );
   } catch (err) {
-    console.error("Heartbeat processing error:", err.message);
+    console.error("❌ Heartbeat processing error:", err.message);
   }
 });
 
-// Optional: periodically mark devices offline if heartbeat missed
+// ---------- OFFLINE FALLBACK ----------
 setInterval(async () => {
-  const threshold = new Date(Date.now() - 30000); // 30 seconds
+  const threshold = new Date(Date.now() - 30_000); // 30 seconds
+
   await Device.updateMany(
-    { lastSeen: { $lt: threshold } },
+    {
+      lastSeen: { $lt: threshold },
+      isActive: true
+    },
     { isActive: false }
   );
-}, 30000);
+}, 30_000);
+
+export default client;
