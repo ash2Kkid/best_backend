@@ -63,12 +63,12 @@ export const registerDevice = async (req, res) => {
 export const getDevicesByRoom = async (req, res) => {
   try {
     const { roomId } = req.params;
+    if (!roomId) return res.status(400).json({ msg: "roomId is required" });
 
-    if (!roomId) {
-      return res.status(400).json({ msg: "roomId is required" });
-    }
-
-    const devices = await Device.find({ room: roomId });
+    const devices = await Device.find({ room: roomId })
+      .select("name deviceId isActive lastSeen home room") // add lastSeen
+      .populate("home", "name")
+      .populate("room", "name");
 
     res.json(devices);
   } catch (err) {
