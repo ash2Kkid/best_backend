@@ -53,15 +53,17 @@ client.on("message", async (topic, message) => {
 
 // ---------- OFFLINE FALLBACK ----------
 setInterval(async () => {
-  const threshold = new Date(Date.now() - 30_000); // 30 seconds
+  const threshold = new Date(Date.now() - 20000); // 20s
 
-  await Device.updateMany(
+  const res = await Device.updateMany(
     {
       lastSeen: { $lt: threshold },
       isActive: true
     },
     { isActive: false }
   );
-}, 30_000);
 
-export default client;
+  if (res.modifiedCount > 0) {
+    console.log("Marked devices offline due to missed heartbeat");
+  }
+}, 10000);
