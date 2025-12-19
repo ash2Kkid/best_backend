@@ -51,19 +51,31 @@ client.on("message", async (topic, message) => {
   }
 });
 
-// ---------- OFFLINE FALLBACK ----------
+// --------------------------------------------------
+// HEARTBEAT WATCHDOG (Solution 3)
+// --------------------------------------------------
 setInterval(async () => {
-  const threshold = new Date(Date.now() - 20000); // 20s
+  try {
+    const threshold = new Date(Date.now() - 20000); // 20 seconds
 
-  const res = await Device.updateMany(
-    {
-      lastSeen: { $lt: threshold },
-      isActive: true
-    },
-    { isActive: false }
-  );
+    const result = await Device.updateMany(
+      {
+        isActive: true,
+        lastSeen: { $lt: threshold }
+      },
+      {
+        isActive: false
+      }
+    );
 
-  if (res.modifiedCount > 0) {
-    console.log("Marked devices offline due to missed heartbeat");
+    if (result.modifiedCount > 0) {
+      console.log(
+        `Watchdog: ${result.modifiedCount} device(s) marked offline`
+      );
+    }
+  } catch (err) {
+    console.error("Watchdog error:", err.message);
   }
-}, 10000);
+}, 10000); // check every 10 seconds
+
+export default client;
