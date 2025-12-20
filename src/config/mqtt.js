@@ -1,5 +1,8 @@
 import mqtt from "mqtt";
 import Device from "../models/Device.js";
+import { v4 as uuidv4 } from "uuid";
+
+export const pendingCommands = new Map();
 
 const MQTT_HOST = process.env.MQTT_HOST || "mqtt://broker.hivemq.com";
 
@@ -114,3 +117,13 @@ export function publishWithAck(topic, payload, cmdId, timeoutMs = 5000) {
 }
 
 export default client;
+
+client.on("message", (topic, message) => {
+  try {
+    if (!topic.endsWith("/ack")) return;
+
+    
+  } catch (err) {
+    console.error("ACK ERROR:", err.message);
+  }
+});
