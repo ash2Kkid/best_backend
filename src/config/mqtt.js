@@ -7,75 +7,110 @@ const options = {};
 if (process.env.MQTT_USERNAME) options.username = process.env.MQTT_USERNAME;
 if (process.env.MQTT_PASSWORD) options.password = process.env.MQTT_PASSWORD;
 
-// Create client
+// ---------------- CLIENT ----------------
 const client = mqtt.connect(MQTT_HOST, options);
 
-// ---------- CONNECTION ----------
+// ---------------- ACK TRACKING ----------------
+const pendingCommands = new Map();
+// cmdId -> { resolve, reject, timeout }
+
+// ---------------- CONNECTION ----------------
 client.on("connect", () => {
   console.log("✅ MQTT Connected");
 
-  // Subscribe to device heartbeat topics
-  client.subscribe("device/bnest/+/status", (err) => {
-    if (err) console.error("❌ MQTT subscription error:", err);
-    else console.log("📡 Subscribed to device status topics");
-  });
+  client.subscribe(
+    ["device/bnest/+/status", "device/bnest/+/ack"],
+    err => {
+      if (err) console.error("❌ MQTT subscribe error:", err);
+      else console.log("📡 Subscribed to status + ack topics");
+    }
+  );
 });
 
-client.on("error", (err) => {
+client.on("error", err => {
   console.error("❌ MQTT Error:", err.message);
 });
 
-// ---------- HEARTBEAT HANDLER ----------
+// ---------------- MESSAGE HANDLER ----------------
 client.on("message", async (topic, message) => {
   try {
     const payload = JSON.parse(message.toString());
 
-    if (!topic.includes("/status")) return;
-    if (!payload.deviceId || !payload.status) return;
+    // -------- HEARTBEAT --------
+    if (topic.endsWith("/status")) {
+      if (!payload.deviceId || !payload.status) return;
 
-    const isOnline = payload.status === "online";
+      const isOnline = payload.status === "online";
 
-    await Device.findOneAndUpdate(
-      { deviceId: payload.deviceId },
-      {
-        isActive: isOnline,
-        lastSeen: new Date()
+      await Device.findOneAndUpdate(
+        { deviceId: payload.deviceId },
+        {
+          isActive: isOnline,
+          lastSeen: new Date()
+        }
+      );
+
+      console.log(
+        `🟢 Device ${payload.deviceId} → ${isOnline ? "ONLINE" : "OFFLINE"}`
+      );
+      return;
+    }
+
+    // -------- ACK --------
+    if (topic.endsWith("/ack")) {
+      const { cmdId, status } = payload;
+
+      if (!cmdId) return;
+
+      const pending = pendingCommands.get(cmdId);
+      if (pending) {
+        pending.resolve(status);
+        clearTimeout(pending.timeout);
+        pendingCommands.delete(cmdId);
+        console.log(`✅ ACK received for ${cmdId}: ${status}`);
       }
-    );
+    }
 
-    console.log(
-      `🟢 Device ${payload.deviceId} → ${isOnline ? "ONLINE" : "OFFLINE"}`
-    );
   } catch (err) {
-    console.error("❌ Heartbeat processing error:", err.message);
+    console.error("❌ MQTT message error:", err.message);
   }
 });
 
-// --------------------------------------------------
-// HEARTBEAT WATCHDOG (Solution 3)
-// --------------------------------------------------
+// ---------------- WATCHDOG ----------------
 setInterval(async () => {
   try {
-    const threshold = new Date(Date.now() - 20000); // 20 seconds
+    const threshold = new Date(Date.now() - 20000);
 
     const result = await Device.updateMany(
       {
         isActive: true,
         lastSeen: { $lt: threshold }
       },
-      {
-        isActive: false
-      }
+      { isActive: false }
     );
 
     if (result.modifiedCount > 0) {
       console.log(
-        `Watchdog: ${result.modifiedCount} device(s) marked offline`
+        `⏱ Watchdog: ${result.modifiedCount} device(s) marked offline`
       );
     }
   } catch (err) {
     console.error("Watchdog error:", err.message);
   }
-}, 10000); // check every 10 seconds
+}, 10000);
+
+// ---------------- COMMAND HELPER ----------------
+export function publishWithAck(topic, payload, cmdId, timeoutMs = 5000) {
+  return new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => {
+      pendingCommands.delete(cmdId);
+      reject(new Error("ACK timeout"));
+    }, timeoutMs);
+
+    pendingCommands.set(cmdId, { resolve, reject, timeout });
+
+    client.publish(topic, JSON.stringify(payload), { qos: 1 });
+  });
+}
 
 export default client;

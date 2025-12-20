@@ -3,7 +3,7 @@ import Device from "../models/Device.js";
 import Room from "../models/Room.js";
 import Home from "../models/Home.js";
 import crypto from "crypto";
-import mqttClient from "../config/mqtt.js";
+import { publishWithAck } from "../config/mqtt.js";
 
 // ADMIN: Register device
 // ADMIN: Register device
@@ -131,17 +131,13 @@ export const sendCommand = async (req, res) => {
       return res.status(400).json({ msg: "deviceId and command required" });
     }
 
-    // 1️⃣ Find active device
     const device = await Device.findOne({ deviceId, isActive: true });
     if (!device) {
       return res.status(404).json({ msg: "Device offline or not found" });
     }
 
-    // 2️⃣ Verify user belongs to the home
     const home = await Home.findById(device.home);
-    if (!home) {
-      return res.status(404).json({ msg: "Home not found" });
-    }
+    if (!home) return res.status(404).json({ msg: "Home not found" });
 
     const isMember = home.members
       .map(id => id.toString())
@@ -151,48 +147,37 @@ export const sendCommand = async (req, res) => {
       return res.status(403).json({ msg: "Not authorized" });
     }
 
-    // 3️⃣ Ensure MQTT is connected
-    if (!mqttClient.connected) {
-      return res.status(503).json({ msg: "MQTT broker not connected" });
-    }
+    const cmdId = crypto.randomUUID();
 
-    // 4️⃣ ✅ PAYLOAD FORMAT ESP EXPECTS
-    const payload = JSON.stringify({
+    const payload = {
+      cmdId,
       command: {
-        command,                // "ON" | "OFF"
+        command, // "ON" | "OFF"
         deviceSecret: device.deviceSecret
       }
-    });
+    };
 
-    mqttClient.publish(
+    const ackStatus = await publishWithAck(
       `device/bnest/${deviceId}/cmd`,
-      payload,
-      { qos: 1 }
+      payload
     );
 
-    // 5️⃣ Optional optimistic DB update
+    if (ackStatus !== "OK") {
+      return res.status(500).json({ msg: "Device rejected command" });
+    }
+
     device.state = command;
     await device.save();
 
-    res.json({ msg: "Command sent" });
+    res.json({ msg: "Command executed", state: command });
 
   } catch (err) {
-    console.error("SEND COMMAND ERROR:", err);
-    res.status(500).json({ msg: "Internal server error" });
+    console.error("SEND COMMAND ERROR:", err.message);
+    res.status(504).json({ msg: "Device did not acknowledge command" });
   }
 };
 
-export const testDeviceConnection = async (req, res) => {
-  const { deviceId } = req.params;
 
-  const device = await Device.findOne({ deviceId });
-  if (!device) return res.status(404).json({ msg: "Device not found" });
 
-  mqttClient.publish(
-    `device/bnest/${deviceId}/cmd`,
-    JSON.stringify({ command: "ping" })
-  );
 
-  res.json({ msg: "Ping sent to device" });
-};
 
