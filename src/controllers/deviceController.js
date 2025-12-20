@@ -65,7 +65,7 @@ export const getDevicesByRoom = async (req, res) => {
     const { roomId } = req.params;
 
     const devices = await Device.find({ room: roomId })
-      .select("name deviceId isActive lastSeen home room")
+      .select("name deviceId deviceSecret isActive lastSeen home room")
       .populate("home", "name")
       .populate("room", "name");
 
