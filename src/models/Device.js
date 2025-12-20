@@ -17,6 +17,7 @@ const deviceSchema = new mongoose.Schema(
     },
 
     deviceSecret: { type: String, required: true },
+    state: { type: String, enum: ["ON", "OFF"], default: "OFF" },
     isActive: { type: Boolean, default: false }, // default false until heartbeat
     lastSeen: { type: Date, default: null },     // <-- added to track heartbeat
 

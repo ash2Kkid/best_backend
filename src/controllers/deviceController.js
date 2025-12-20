@@ -131,36 +131,54 @@ export const sendCommand = async (req, res) => {
       return res.status(400).json({ msg: "deviceId and command required" });
     }
 
-    // Find device and ensure it is active
+    // 1️⃣ Find active device
     const device = await Device.findOne({ deviceId, isActive: true });
-    if (!device) return res.status(404).json({ msg: "Device not found" });
+    if (!device) {
+      return res.status(404).json({ msg: "Device offline or not found" });
+    }
 
-    // Check if user is a member of the home
+    // 2️⃣ Verify user belongs to the home
     const home = await Home.findById(device.home);
-    if (!home) return res.status(404).json({ msg: "Home not found" });
+    if (!home) {
+      return res.status(404).json({ msg: "Home not found" });
+    }
 
     const isMember = home.members
       .map(id => id.toString())
       .includes(req.user.id);
 
-    if (!isMember) return res.status(403).json({ msg: "Not authorized" });
+    if (!isMember) {
+      return res.status(403).json({ msg: "Not authorized" });
+    }
 
+    // 3️⃣ Ensure MQTT is connected
     if (!mqttClient.connected) {
       return res.status(503).json({ msg: "MQTT broker not connected" });
     }
 
-    // Include deviceSecret in payload for ESP32 to verify
+    // 4️⃣ ✅ PAYLOAD FORMAT ESP EXPECTS
     const payload = JSON.stringify({
-      command,
-      deviceSecret: device.deviceSecret
+      command: {
+        command,                // "ON" | "OFF"
+        deviceSecret: device.deviceSecret
+      }
     });
 
-    mqttClient.publish(`device/bnest/${deviceId}/cmd`, payload);
+    mqttClient.publish(
+      `device/bnest/${deviceId}/cmd`,
+      payload,
+      { qos: 1 }
+    );
+
+    // 5️⃣ Optional optimistic DB update
+    device.state = command;
+    await device.save();
 
     res.json({ msg: "Command sent" });
+
   } catch (err) {
     console.error("SEND COMMAND ERROR:", err);
-    res.status(500).json({ msg: err.message });
+    res.status(500).json({ msg: "Internal server error" });
   }
 };
 
