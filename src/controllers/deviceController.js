@@ -73,6 +73,7 @@ export const getDevicesByRoom = async (req, res) => {
       _id: d._id,
       name: d.name,
       deviceId: d.deviceId,
+      deviceSecret: d.deviceSecret,
       isActive: d.isActive,
       lastSeen: d.lastSeen,
       homeName: d.home?.name,
