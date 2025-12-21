@@ -24,8 +24,7 @@ import {
   registerDevice,
   updateDevice,
   deleteDevice,
-  getDevicesByRoom,
-  testDeviceConnection
+  getDevicesByRoom
 } from "../controllers/deviceController.js";
 
 const router = Router();
@@ -54,7 +53,6 @@ router.post("/devices", auth, adminOnly, registerDevice);
 router.put("/devices/:deviceId", auth, adminOnly, updateDevice);
 router.delete("/devices/:deviceId", auth, adminOnly, deleteDevice);
 router.get("/rooms/:roomId/devices", auth, adminOnly, getDevicesByRoom);
-router.post("/admin/devices/test/:deviceId", auth, adminOnly, testDeviceConnection);
 
 export default router;
 
