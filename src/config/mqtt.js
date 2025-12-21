@@ -2,7 +2,6 @@ import mqtt from "mqtt";
 import Device from "../models/Device.js";
 import { v4 as uuidv4 } from "uuid";
 
-export const pendingCommands = new Map();
 
 const MQTT_HOST = process.env.MQTT_HOST || "mqtt://broker.hivemq.com";
 
