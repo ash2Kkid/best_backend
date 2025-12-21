@@ -1,43 +1,62 @@
 import mqtt from "mqtt";
 import Device from "../models/Device.js";
 
-
+/* --------------------------------------------------
+   MQTT CONFIG
+-------------------------------------------------- */
 const MQTT_HOST = process.env.MQTT_HOST || "mqtt://broker.hivemq.com";
 
 const options = {};
 if (process.env.MQTT_USERNAME) options.username = process.env.MQTT_USERNAME;
 if (process.env.MQTT_PASSWORD) options.password = process.env.MQTT_PASSWORD;
 
-// ---------------- CLIENT ----------------
+/* --------------------------------------------------
+   CLIENT
+-------------------------------------------------- */
 const client = mqtt.connect(MQTT_HOST, options);
 
-// ---------------- ACK TRACKING ----------------
-const pendingCommands = new Map();
+/* --------------------------------------------------
+   ACK TRACKING
+-------------------------------------------------- */
 // cmdId -> { resolve, reject, timeout }
+const pendingCommands = new Map();
 
-// ---------------- CONNECTION ----------------
+/* --------------------------------------------------
+   CONNECT
+-------------------------------------------------- */
 client.on("connect", () => {
   console.log("✅ MQTT Connected");
 
   client.subscribe(
-    ["device/bnest/+/status", "device/bnest/+/ack"],
+    [
+      "device/bnest/+/status",
+      "device/bnest/+/ack"
+    ],
     err => {
-      if (err) console.error("❌ MQTT subscribe error:", err);
-      else console.log("📡 Subscribed to status + ack topics");
+      if (err) {
+        console.error("❌ MQTT subscribe error:", err.message);
+      } else {
+        console.log("📡 Subscribed to status + ack topics");
+      }
     }
   );
 });
 
+/* --------------------------------------------------
+   ERROR
+-------------------------------------------------- */
 client.on("error", err => {
   console.error("❌ MQTT Error:", err.message);
 });
 
-// ---------------- MESSAGE HANDLER ----------------
+/* --------------------------------------------------
+   MESSAGE HANDLER (SINGLE SOURCE OF TRUTH)
+-------------------------------------------------- */
 client.on("message", async (topic, message) => {
   try {
     const payload = JSON.parse(message.toString());
 
-    // -------- HEARTBEAT --------
+    /* ---------------- HEARTBEAT ---------------- */
     if (topic.endsWith("/status")) {
       if (!payload.deviceId || !payload.status) return;
 
@@ -57,19 +76,20 @@ client.on("message", async (topic, message) => {
       return;
     }
 
-    // -------- ACK --------
+    /* ---------------- ACK ---------------- */
     if (topic.endsWith("/ack")) {
       const { cmdId, status } = payload;
-
       if (!cmdId) return;
 
       const pending = pendingCommands.get(cmdId);
-      if (pending) {
-        pending.resolve(status);
-        clearTimeout(pending.timeout);
-        pendingCommands.delete(cmdId);
-        console.log(`✅ ACK received for ${cmdId}: ${status}`);
-      }
+      if (!pending) return;
+
+      clearTimeout(pending.timeout);
+      pending.resolve(status || "OK");
+      pendingCommands.delete(cmdId);
+
+      console.log(`✅ ACK received for ${cmdId}: ${status}`);
+      return;
     }
 
   } catch (err) {
@@ -77,10 +97,12 @@ client.on("message", async (topic, message) => {
   }
 });
 
-// ---------------- WATCHDOG ----------------
+/* --------------------------------------------------
+   WATCHDOG (DEVICE OFFLINE DETECTOR)
+-------------------------------------------------- */
 setInterval(async () => {
   try {
-    const threshold = new Date(Date.now() - 20000);
+    const threshold = new Date(Date.now() - 20000); // 20s silence
 
     const result = await Device.updateMany(
       {
@@ -100,7 +122,9 @@ setInterval(async () => {
   }
 }, 10000);
 
-// ---------------- COMMAND HELPER ----------------
+/* --------------------------------------------------
+   PUBLISH WITH ACK
+-------------------------------------------------- */
 export function publishWithAck(topic, payload, cmdId, timeoutMs = 5000) {
   return new Promise((resolve, reject) => {
     const timeout = setTimeout(() => {
@@ -108,20 +132,17 @@ export function publishWithAck(topic, payload, cmdId, timeoutMs = 5000) {
       reject(new Error("ACK timeout"));
     }, timeoutMs);
 
-    pendingCommands.set(cmdId, { resolve, reject, timeout });
+    pendingCommands.set(cmdId, {
+      resolve,
+      reject,
+      timeout
+    });
 
     client.publish(topic, JSON.stringify(payload), { qos: 1 });
   });
 }
 
+/* --------------------------------------------------
+   EXPORT CLIENT
+-------------------------------------------------- */
 export default client;
-
-client.on("message", (topic, message) => {
-  try {
-    if (!topic.endsWith("/ack")) return;
-
-    
-  } catch (err) {
-    console.error("ACK ERROR:", err.message);
-  }
-});
