@@ -147,19 +147,22 @@ export const sendCommand = async (req, res) => {
       return res.status(403).json({ msg: "Not authorized" });
     }
 
+    // ✅ Backend generates cmdId
     const cmdId = crypto.randomUUID();
 
+    // ✅ EXACT payload ESP expects
     const payload = {
       cmdId,
-      command: {
-        command, // "ON" | "OFF"
-        deviceSecret: device.deviceSecret
-      }
+      command,                 // "ON" | "OFF"
+      deviceSecret: device.deviceSecret
     };
 
+    // ✅ WAIT FOR ACK
     const ackStatus = await publishWithAck(
       `device/bnest/${deviceId}/cmd`,
-      payload
+      payload,
+      cmdId,          // ⬅️ REQUIRED
+      5000
     );
 
     if (ackStatus !== "OK") {
