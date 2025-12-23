@@ -30,13 +30,14 @@ client.on("connect", () => {
   client.subscribe(
     [
       "device/bnest/+/status",
-      "device/bnest/+/ack"
+      "device/bnest/+/ack",
+      "device/bnest/+/state"
     ],
     err => {
       if (err) {
         console.error("❌ MQTT subscribe error:", err.message);
       } else {
-        console.log("📡 Subscribed to status + ack topics");
+        console.log("📡 Subscribed to status + ack + state topics");
       }
     }
   );
@@ -91,6 +92,25 @@ client.on("message", async (topic, message) => {
       console.log(`✅ ACK received for ${cmdId}: ${status}`);
       return;
     }
+
+    /* ---------------- STATE ---------------- */
+if (topic.endsWith("/state")) {
+  const { deviceId, state } = payload;
+
+  if (!deviceId || !state) return;
+  if (!["ON", "OFF"].includes(state)) return;
+
+  await Device.findOneAndUpdate(
+    { deviceId },
+    {
+      state,
+      lastStateSync: new Date()
+    }
+  );
+
+  console.log(`🔄 State synced: ${deviceId} → ${state}`);
+  return;
+}
 
   } catch (err) {
     console.error("❌ MQTT message error:", err.message);

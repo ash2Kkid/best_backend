@@ -182,5 +182,17 @@ export const sendCommand = async (req, res) => {
 
 
 
+export const getDeviceState = async (req, res) => {
+  const device = await Device.findOne({ deviceId: req.params.deviceId });
 
+  if (!device) {
+    return res.status(404).json({ msg: "Device not found" });
+  }
+
+  res.json({
+    deviceId: device.deviceId,
+    state: device.state,       // "ON" | "OFF"
+    isOnline: device.isActive
+  });
+};
 
