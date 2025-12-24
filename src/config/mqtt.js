@@ -1,5 +1,7 @@
 import mqtt from "mqtt";
 import Device from "../models/Device.js";
+import Home from "../models/Home.js";
+import { broadcastToUser } from "sse.js";
 
 /* --------------------------------------------------
    MQTT CONFIG
@@ -51,7 +53,7 @@ client.on("error", err => {
 });
 
 /* --------------------------------------------------
-   MESSAGE HANDLER (SINGLE SOURCE OF TRUTH)
+   MESSAGE HANDLER
 -------------------------------------------------- */
 client.on("message", async (topic, message) => {
   try {
@@ -59,12 +61,13 @@ client.on("message", async (topic, message) => {
 
     /* ---------------- HEARTBEAT ---------------- */
     if (topic.endsWith("/status")) {
-      if (!payload.deviceId || !payload.status) return;
+      const { deviceId, status } = payload;
+      if (!deviceId || !status) return;
 
-      const isOnline = payload.status === "online";
+      const isOnline = status === "online";
 
       await Device.findOneAndUpdate(
-        { deviceId: payload.deviceId },
+        { deviceId },
         {
           isActive: isOnline,
           lastSeen: new Date()
@@ -72,7 +75,7 @@ client.on("message", async (topic, message) => {
       );
 
       console.log(
-        `🟢 Device ${payload.deviceId} → ${isOnline ? "ONLINE" : "OFFLINE"}`
+        `🟢 Device ${deviceId} → ${isOnline ? "ONLINE" : "OFFLINE"}`
       );
       return;
     }
@@ -83,35 +86,53 @@ client.on("message", async (topic, message) => {
       if (!cmdId) return;
 
       const pending = pendingCommands.get(cmdId);
-      if (!pending) return;
+      if (!pending) {
+        console.warn(`⚠️ Late ACK ignored: ${cmdId}`);
+        return;
+      }
 
       clearTimeout(pending.timeout);
-      pending.resolve(status || "OK");
       pendingCommands.delete(cmdId);
 
-      console.log(`✅ ACK received for ${cmdId}: ${status}`);
+      if (status === "OK") {
+        pending.resolve("OK");
+      } else {
+        pending.reject(new Error(status || "ACK_ERROR"));
+      }
+
+      console.log(`✅ ACK received: ${cmdId} → ${status}`);
       return;
     }
 
     /* ---------------- STATE ---------------- */
-if (topic.endsWith("/state")) {
+    if (topic.endsWith("/state")) {
   const { deviceId, state } = payload;
-
   if (!deviceId || !state) return;
-  if (!["ON", "OFF"].includes(state)) return;
 
-  await Device.findOneAndUpdate(
+  const device = await Device.findOneAndUpdate(
     { deviceId },
     {
       state,
       lastStateSync: new Date()
-    }
+    },
+    { new: true }
   );
 
-  console.log(`🔄 State synced: ${deviceId} → ${state}`);
+  if (!device) return;
+
+  const home = await Home.findById(device.home);
+  if (!home) return;
+
+  for (const memberId of home.members) {
+    broadcastToUser(memberId.toString(), "device_state", {
+      deviceId,
+      state
+    });
+  }
+
+  console.log(`📡 SSE pushed: ${deviceId} → ${state}`);
   return;
 }
-
   } catch (err) {
     console.error("❌ MQTT message error:", err.message);
   }
@@ -161,6 +182,15 @@ export function publishWithAck(topic, payload, cmdId, timeoutMs = 5000) {
     client.publish(topic, JSON.stringify(payload), { qos: 1 });
   });
 }
+
+/* --------------------------------------------------
+   DEBUG: PENDING COMMAND MONITOR
+-------------------------------------------------- */
+setInterval(() => {
+  if (pendingCommands.size > 0) {
+    console.log(`📊 Pending commands: ${pendingCommands.size}`);
+  }
+}, 5000);
 
 /* --------------------------------------------------
    EXPORT CLIENT
