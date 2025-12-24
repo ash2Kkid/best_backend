@@ -1,7 +1,7 @@
 import mqtt from "mqtt";
 import Device from "../models/Device.js";
 import Home from "../models/Home.js";
-import { broadcastToUser } from "sse.js";
+import { broadcastToUser } from "../config/sse.js";
 
 /* --------------------------------------------------
    MQTT CONFIG
