@@ -1,5 +1,3 @@
-import mongoose from "mongoose";
-
 const deviceSchema = new mongoose.Schema(
   {
     deviceId: { type: String, unique: true, required: true },
@@ -17,9 +15,35 @@ const deviceSchema = new mongoose.Schema(
     },
 
     deviceSecret: { type: String, required: true },
-    state: { type: String, enum: ["ON", "OFF"], default: "OFF" },
-    isActive: { type: Boolean, default: false }, // default false until heartbeat
-    lastSeen: { type: Date, default: null },     // <-- added to track heartbeat
+
+    // ---------------- CORE STATE ----------------
+    state: {
+      type: String,
+      enum: ["ON", "OFF"],
+      default: "OFF"
+    },
+
+    lastStateSync: {
+      type: Date,
+      default: null
+    },
+
+    // ---------------- LIVENESS ----------------
+    isActive: {
+      type: Boolean,
+      default: false
+    },
+
+    lastSeen: {
+      type: Date,
+      default: null
+    },
+
+    // ---------------- NOTIFICATION CONTROL ----------------
+    notifiedOffline: {
+      type: Boolean,
+      default: false
+    },
 
     meta: {
       type: Object,
@@ -28,5 +52,3 @@ const deviceSchema = new mongoose.Schema(
   },
   { timestamps: true }
 );
-
-export default mongoose.model("Device", deviceSchema);

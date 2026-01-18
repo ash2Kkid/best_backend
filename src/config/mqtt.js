@@ -2,6 +2,7 @@ import mqtt from "mqtt";
 import Device from "../models/Device.js";
 import Home from "../models/Home.js";
 import { broadcastToUser } from "../config/sse.js";
+import { sendPushToUsers } from "../services/pushService.js";
 
 /* --------------------------------------------------
    MQTT CONFIG
@@ -13,7 +14,7 @@ if (process.env.MQTT_USERNAME) options.username = process.env.MQTT_USERNAME;
 if (process.env.MQTT_PASSWORD) options.password = process.env.MQTT_PASSWORD;
 
 /* --------------------------------------------------
-   CLIENT
+   MQTT CLIENT
 -------------------------------------------------- */
 const client = mqtt.connect(MQTT_HOST, options);
 
@@ -53,7 +54,7 @@ client.on("error", err => {
 });
 
 /* --------------------------------------------------
-   MESSAGE HANDLER
+   MESSAGE HANDLER (SINGLE SOURCE OF TRUTH)
 -------------------------------------------------- */
 client.on("message", async (topic, message) => {
   try {
@@ -70,7 +71,7 @@ client.on("message", async (topic, message) => {
         { deviceId },
         {
           isActive: isOnline,
-          lastSeen: new Date()
+          ...(isOnline && { lastSeen: new Date() })
         }
       );
 
@@ -97,7 +98,10 @@ client.on("message", async (topic, message) => {
       if (status === "OK") {
         pending.resolve("OK");
       } else {
-        pending.reject(new Error(status || "ACK_ERROR"));
+        pending.reject({
+          type: "DEVICE_ACK_FAILED",
+          status
+        });
       }
 
       console.log(`✅ ACK received: ${cmdId} → ${status}`);
@@ -106,33 +110,35 @@ client.on("message", async (topic, message) => {
 
     /* ---------------- STATE ---------------- */
     if (topic.endsWith("/state")) {
-  const { deviceId, state } = payload;
-  if (!deviceId || !state) return;
+      const { deviceId, state } = payload;
+      if (!deviceId || !state) return;
+      if (!["ON", "OFF"].includes(state)) return;
 
-  const device = await Device.findOneAndUpdate(
-    { deviceId },
-    {
-      state,
-      lastStateSync: new Date()
-    },
-    { new: true }
-  );
+      const device = await Device.findOneAndUpdate(
+        { deviceId },
+        {
+          state,
+          lastStateSync: new Date()
+        },
+        { new: true }
+      );
 
-  if (!device) return;
+      if (!device) return;
 
-  const home = await Home.findById(device.home);
-  if (!home) return;
+      const home = await Home.findById(device.home);
+      if (!home) return;
 
-  for (const memberId of home.members) {
-    broadcastToUser(memberId.toString(), "device_state", {
-      deviceId,
-      state
-    });
-  }
+      // Push realtime update to all home members
+      for (const memberId of home.members) {
+        broadcastToUser(memberId.toString(), "device_state", {
+          deviceId,
+          state
+        });
+      }
 
-  console.log(`📡 SSE pushed: ${deviceId} → ${state}`);
-  return;
-}
+      console.log(`📡 SSE pushed: ${deviceId} → ${state}`);
+      return;
+    }
   } catch (err) {
     console.error("❌ MQTT message error:", err.message);
   }
@@ -143,23 +149,35 @@ client.on("message", async (topic, message) => {
 -------------------------------------------------- */
 setInterval(async () => {
   try {
-    const threshold = new Date(Date.now() - 20000); // 20s silence
+    const threshold = new Date(Date.now() - 20000);
 
-    const result = await Device.updateMany(
+    const offlineDevices = await Device.find({
+      isActive: true,
+      lastSeen: { $lt: threshold }
+    }).populate("home");
+
+    if (!offlineDevices.length) return;
+
+    await Device.updateMany(
       {
-        isActive: true,
-        lastSeen: { $lt: threshold }
+        _id: { $in: offlineDevices.map(d => d._id) }
       },
       { isActive: false }
     );
 
-    if (result.modifiedCount > 0) {
-      console.log(
-        `⏱ Watchdog: ${result.modifiedCount} device(s) marked offline`
+    for (const device of offlineDevices) {
+      if (!device.home) continue;
+
+      await sendPushToUsers(
+        device.home.members,
+        "Device Offline",
+        `${device.name} went offline`
       );
+
+      console.log(`🔔 Push sent: ${device.name} offline`);
     }
   } catch (err) {
-    console.error("Watchdog error:", err.message);
+    console.error("❌ Watchdog error:", err.message);
   }
 }, 10000);
 
@@ -170,7 +188,10 @@ export function publishWithAck(topic, payload, cmdId, timeoutMs = 5000) {
   return new Promise((resolve, reject) => {
     const timeout = setTimeout(() => {
       pendingCommands.delete(cmdId);
-      reject(new Error("ACK timeout"));
+      reject({
+        type: "ACK_TIMEOUT",
+        cmdId
+      });
     }, timeoutMs);
 
     pendingCommands.set(cmdId, {
