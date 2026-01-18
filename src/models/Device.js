@@ -52,3 +52,6 @@ const deviceSchema = new mongoose.Schema(
   },
   { timestamps: true }
 );
+
+// ✅ THIS LINE WAS MISSING
+export default mongoose.model("Device", deviceSchema);

@@ -68,12 +68,13 @@ client.on("message", async (topic, message) => {
       const isOnline = status === "online";
 
       await Device.findOneAndUpdate(
-        { deviceId },
-        {
-          isActive: isOnline,
-          ...(isOnline && { lastSeen: new Date() })
-        }
-      );
+  { deviceId },
+  {
+    isActive: true,
+    lastSeen: new Date(),
+    notifiedOffline: false
+  }
+);
 
       console.log(
         `🟢 Device ${deviceId} → ${isOnline ? "ONLINE" : "OFFLINE"}`
