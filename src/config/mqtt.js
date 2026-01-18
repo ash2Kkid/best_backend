@@ -158,12 +158,28 @@ setInterval(async () => {
 
     if (!offlineDevices.length) return;
 
-    await Device.updateMany(
-      {
-        _id: { $in: offlineDevices.map(d => d._id) }
-      },
-      { isActive: false }
+    const devices = await Device.find({
+  isActive: true,
+  lastSeen: { $lt: threshold }
+});
+
+for (const device of devices) {
+  device.isActive = false;
+
+  if (!device.notifiedOffline) {
+    const home = await Home.findById(device.home);
+
+    await sendPushToUsers(
+      home.members,
+      "Device Offline",
+      `${device.name} went offline`
     );
+
+    device.notifiedOffline = true;
+  }
+
+  await device.save();
+}
 
     for (const device of offlineDevices) {
       if (!device.home) continue;
