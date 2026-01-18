@@ -4,26 +4,14 @@ import UserDeviceToken from "../models/UserDeviceToken.js";
 export async function sendPushToUsers(userIds, title, body) {
   const tokens = await UserDeviceToken.find({
     user: { $in: userIds }
-  });
+  }).select("token");
 
   if (!tokens.length) return;
 
-  const messages = tokens.map(t => ({
-    token: t.token,
-    notification: {
-      title,
-      body
-    },
-    android: {
-      priority: "high"
-    }
-  }));
+  const message = {
+    notification: { title, body },
+    tokens: tokens.map(t => t.token)
+  };
 
-  await Promise.all(
-    messages.map(msg =>
-      admin.messaging().send(msg).catch(err => {
-        console.error("FCM error:", err.message);
-      })
-    )
-  );
+  await admin.messaging().sendEachForMulticast(message);
 }
