@@ -7,9 +7,6 @@ import {
   createUser,
   updateUser,
   deleteUser,
-  getPendingRequests,
-  approveDevice,
-  rejectDevice
 } from "../controllers/adminController.js";
 import {
     getMyHomes,
@@ -27,7 +24,10 @@ import {
   registerDevice,
   updateDevice,
   deleteDevice,
-  getDevicesByRoom
+  getDevicesByRoom,
+  getPendingRequests,
+  approveDevice,
+  rejectDevice
 } from "../controllers/deviceController.js";
 
 const router = Router();
