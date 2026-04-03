@@ -2,21 +2,57 @@ import mongoose from "mongoose";
 
 const deviceSchema = new mongoose.Schema(
   {
+    // ---------------- BASIC ----------------
     deviceId: { type: String, unique: true, required: true },
     name: { type: String, required: true },
+
+    // ---------------- OWNERSHIP ----------------
+    owner: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      default: null
+    },
+
+    requestedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      default: null
+    },
 
     home: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Home",
-      required: true
+      default: null // assigned after approval
     },
+
     room: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Room",
-      required: true
+      default: null // assigned after approval
     },
 
-    deviceSecret: { type: String, required: true },
+    // ---------------- SECURITY ----------------
+    deviceSecret: {
+      type: String,
+      default: null // generated after approval
+    },
+
+    // ---------------- ONBOARDING ----------------
+    status: {
+      type: String,
+      enum: ["unregistered", "pending", "active", "rejected"],
+      default: "unregistered"
+    },
+
+    provisioningKey: {
+      type: String,
+      default: null
+    },
+
+    provisioningExpiresAt: {
+      type: Date,
+      default: null
+    },
 
     // ---------------- CORE STATE ----------------
     state: {
@@ -41,12 +77,13 @@ const deviceSchema = new mongoose.Schema(
       default: null
     },
 
-    // ---------------- NOTIFICATION CONTROL ----------------
+    // ---------------- NOTIFICATIONS ----------------
     notifiedOffline: {
       type: Boolean,
       default: false
     },
 
+    // ---------------- FLEX DATA ----------------
     meta: {
       type: Object,
       default: {}
@@ -55,5 +92,4 @@ const deviceSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-// ✅ THIS LINE WAS MISSING
 export default mongoose.model("Device", deviceSchema);

@@ -4,8 +4,10 @@ import Home from "../models/Home.js";
 import Room from "../models/Room.js";
 import Device from "../models/Device.js";
 
-// --- Existing CRUD functions ---
 
+// =========================
+// 👤 GET ALL USERS
+// =========================
 export const getAllUsers = async (req, res) => {
   try {
     const populateHomes = req.query.populateHomes === "true";
@@ -23,70 +25,118 @@ export const getAllUsers = async (req, res) => {
         const userHomes = homes.filter(h =>
           h.members.some(m => m.toString() === user._id.toString())
         );
+
         return {
           ...user,
-          homes: userHomes.map(h => ({ _id: h._id, name: h.name }))
+          homes: userHomes.map(h => ({
+            _id: h._id,
+            name: h.name
+          }))
         };
       });
+
     } else {
       users = await User.find({ role: "USER" }).select("email role");
     }
 
     res.json(users);
+
   } catch (err) {
     console.error(err);
     res.status(500).json({ msg: "Failed to fetch users" });
   }
 };
 
+
+// =========================
+// 👤 CREATE USER
+// =========================
 export const createUser = async (req, res) => {
   try {
     const { email, password } = req.body;
+
     const existing = await User.findOne({ email });
-    if (existing) return res.status(400).json({ msg: "User already exists" });
+    if (existing) {
+      return res.status(400).json({ msg: "User already exists" });
+    }
 
     const passwordHash = await bcrypt.hash(password, 10);
-    const user = await User.create({ email, passwordHash, role: "USER" });
 
-    res.status(201).json({ email: user.email, role: user.role });
+    const user = await User.create({
+      email,
+      passwordHash,
+      role: "USER"
+    });
+
+    res.status(201).json({
+      email: user.email,
+      role: user.role
+    });
+
   } catch (err) {
     console.error(err);
     res.status(500).json({ msg: "Failed to create user" });
   }
 };
 
+
+// =========================
+// 👤 UPDATE USER
+// =========================
 export const updateUser = async (req, res) => {
   try {
     const { userId } = req.params;
     const { email, password } = req.body;
 
     const user = await User.findById(userId);
-    if (!user) return res.status(404).json({ msg: "User not found" });
+    if (!user) {
+      return res.status(404).json({ msg: "User not found" });
+    }
 
     if (email) user.email = email;
-    if (password) user.passwordHash = await bcrypt.hash(password, 10);
+    if (password) {
+      user.passwordHash = await bcrypt.hash(password, 10);
+    }
 
     await user.save();
-    res.json({ msg: "User updated", email: user.email, role: user.role });
+
+    res.json({
+      msg: "User updated",
+      email: user.email,
+      role: user.role
+    });
+
   } catch (err) {
     console.error(err);
     res.status(500).json({ msg: "Failed to update user" });
   }
 };
 
+
+// =========================
+// 👤 DELETE USER
+// =========================
 export const deleteUser = async (req, res) => {
   try {
     const { userId } = req.params;
+
     const user = await User.findByIdAndDelete(userId);
-    if (!user) return res.status(404).json({ msg: "User not found" });
+    if (!user) {
+      return res.status(404).json({ msg: "User not found" });
+    }
+
     res.json({ msg: "User deleted" });
+
   } catch (err) {
     console.error(err);
     res.status(500).json({ msg: "Failed to delete user" });
   }
 };
 
-// --- New API: Users with Homes, Rooms, Devices ---
+
+// =========================
+// 📊 USERS WITH FULL DATA (HOMES → ROOMS → DEVICES)
+// =========================
 export const getUsersWithHomes = async (req, res) => {
   try {
     const users = await User.find({ role: "USER" }).lean();
@@ -101,17 +151,84 @@ export const getUsersWithHomes = async (req, res) => {
         const roomsWithDevices = [];
 
         for (const room of rooms) {
-          const devices = await Device.find({ room: room._id }).lean();
-          roomsWithDevices.push({ ...room, devices });
+          const devices = await Device.find({
+            room: room._id,
+            status: "active",           // ✅ IMPORTANT FIX
+            owner: user._id             // ✅ prevents cross-user leaks
+          })
+          .select("deviceId name state isActive lastSeen")
+          .lean();
+
+          roomsWithDevices.push({
+            ...room,
+            devices
+          });
         }
 
-        homesWithRoomsAndDevices.push({ ...home, rooms: roomsWithDevices });
+        homesWithRoomsAndDevices.push({
+          ...home,
+          rooms: roomsWithDevices
+        });
       }
 
-      result.push({ ...user, homes: homesWithRoomsAndDevices });
+      result.push({
+        ...user,
+        homes: homesWithRoomsAndDevices
+      });
     }
 
     res.json(result);
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ msg: err.message });
+  }
+};
+
+
+// =========================
+// ⏳ GET PENDING DEVICES (FOR ADMIN APPROVAL)
+// =========================
+export const getPendingDevices = async (req, res) => {
+  try {
+    const devices = await Device.find({ status: "pending" })
+      .populate("requestedBy", "email")
+      .select("deviceId name requestedBy createdAt");
+
+    res.json(devices);
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ msg: err.message });
+  }
+};
+
+
+// =========================
+// 🔄 RESET DEVICE (RE-ONBOARDING)
+// =========================
+export const resetDevice = async (req, res) => {
+  try {
+    const { deviceId } = req.body;
+
+    const device = await Device.findOne({ deviceId });
+
+    if (!device) {
+      return res.status(404).json({ msg: "Device not found" });
+    }
+
+    device.status = "unregistered";
+    device.owner = null;
+    device.requestedBy = null;
+    device.home = null;
+    device.room = null;
+    device.deviceSecret = null;
+    device.isActive = false;
+
+    await device.save();
+
+    res.json({ msg: "Device reset successfully" });
+
   } catch (err) {
     console.error(err);
     res.status(500).json({ msg: err.message });

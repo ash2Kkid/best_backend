@@ -7,6 +7,9 @@ import {
   createUser,
   updateUser,
   deleteUser,
+  getPendingRequests,
+  approveDevice,
+  rejectDevice
 } from "../controllers/adminController.js";
 import {
     getMyHomes,
@@ -53,6 +56,17 @@ router.post("/devices", auth, adminOnly, registerDevice);
 router.put("/devices/:deviceId", auth, adminOnly, updateDevice);
 router.delete("/devices/:deviceId", auth, adminOnly, deleteDevice);
 router.get("/rooms/:roomId/devices", auth, adminOnly, getDevicesByRoom);
+
+// ---------------- 🆕 DEVICE ONBOARDING ----------------
+
+// Get all pending pairing requests
+router.get("/devices/pending", auth, adminOnly, getPendingRequests);
+
+// Approve device (assign to user + home + room)
+router.post("/devices/approve", auth, adminOnly, approveDevice);
+
+// Reject request
+router.post("/devices/reject", auth, adminOnly, rejectDevice);
 
 export default router;
 

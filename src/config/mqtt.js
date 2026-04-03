@@ -21,7 +21,6 @@ const client = mqtt.connect(MQTT_HOST, options);
 /* --------------------------------------------------
    ACK TRACKING
 -------------------------------------------------- */
-// cmdId -> { resolve, reject, timeout }
 const pendingCommands = new Map();
 
 /* --------------------------------------------------
@@ -54,7 +53,7 @@ client.on("error", err => {
 });
 
 /* --------------------------------------------------
-   MESSAGE HANDLER (SINGLE SOURCE OF TRUTH)
+   MESSAGE HANDLER
 -------------------------------------------------- */
 client.on("message", async (topic, message) => {
   try {
@@ -62,29 +61,36 @@ client.on("message", async (topic, message) => {
 
     /* ---------------- HEARTBEAT ---------------- */
     if (topic.endsWith("/status")) {
-      const { deviceId, status } = payload;
-      if (!deviceId || !status) return;
+      const { deviceId, status, deviceSecret } = payload;
 
-      const isOnline = status === "online";
+      if (!deviceId || !status || !deviceSecret) return;
+
+      const device = await Device.findOne({ deviceId });
+
+      if (!device || device.deviceSecret !== deviceSecret) {
+        console.warn(`❌ Unauthorized device (status): ${deviceId}`);
+        return;
+      }
+
+      if (device.status !== "active") return;
 
       await Device.findOneAndUpdate(
-  { deviceId },
-  {
-    isActive: true,
-    lastSeen: new Date(),
-    notifiedOffline: false
-  }
-);
-
-      console.log(
-        `🟢 Device ${deviceId} → ${isOnline ? "ONLINE" : "OFFLINE"}`
+        { deviceId },
+        {
+          isActive: status === "online",
+          lastSeen: new Date(),
+          notifiedOffline: false
+        }
       );
+
+      console.log(`🟢 [MQTT] ${deviceId} → ${status}`);
       return;
     }
 
     /* ---------------- ACK ---------------- */
     if (topic.endsWith("/ack")) {
-      const { cmdId, status } = payload;
+      const { cmdId, status, deviceId } = payload;
+
       if (!cmdId) return;
 
       const pending = pendingCommands.get(cmdId);
@@ -111,25 +117,37 @@ client.on("message", async (topic, message) => {
 
     /* ---------------- STATE ---------------- */
     if (topic.endsWith("/state")) {
-      const { deviceId, state } = payload;
-      if (!deviceId || !state) return;
+      const { deviceId, state, deviceSecret } = payload;
+
+      if (!deviceId || !state || !deviceSecret) return;
       if (!["ON", "OFF"].includes(state)) return;
 
-      const device = await Device.findOneAndUpdate(
+      const device = await Device.findOne({ deviceId });
+
+      if (!device || device.deviceSecret !== deviceSecret) {
+        console.warn(`❌ Unauthorized device (state): ${deviceId}`);
+        return;
+      }
+
+      if (device.status !== "active") return;
+
+      const updated = await Device.findOneAndUpdate(
         { deviceId },
         {
           state,
-          lastStateSync: new Date()
+          lastStateSync: new Date(),
+          lastSeen: new Date(),
+          isActive: true
         },
         { new: true }
       );
 
-      if (!device) return;
+      if (!updated) return;
 
-      const home = await Home.findById(device.home);
+      const home = await Home.findById(updated.home);
       if (!home) return;
 
-      // Push realtime update to all home members
+      // SSE broadcast
       for (const memberId of home.members) {
         broadcastToUser(memberId.toString(), "device_state", {
           deviceId,
@@ -137,7 +155,7 @@ client.on("message", async (topic, message) => {
         });
       }
 
-      console.log(`📡 SSE pushed: ${deviceId} → ${state}`);
+      console.log(`📡 [MQTT] ${deviceId} → STATE ${state}`);
       return;
     }
   } catch (err) {
@@ -146,52 +164,33 @@ client.on("message", async (topic, message) => {
 });
 
 /* --------------------------------------------------
-   WATCHDOG (DEVICE OFFLINE DETECTOR)
+   WATCHDOG (OFFLINE DETECTOR)
 -------------------------------------------------- */
 setInterval(async () => {
   try {
     const threshold = new Date(Date.now() - 20000);
 
-    const offlineDevices = await Device.find({
+    const devices = await Device.find({
       isActive: true,
       lastSeen: { $lt: threshold }
     }).populate("home");
 
-    if (!offlineDevices.length) return;
+    for (const device of devices) {
+      device.isActive = false;
 
-    const devices = await Device.find({
-  isActive: true,
-  lastSeen: { $lt: threshold }
-});
+      if (!device.notifiedOffline && device.home) {
+        await sendPushToUsers(
+          device.home.members,
+          "Device Offline",
+          `${device.name} went offline`
+        );
 
-for (const device of devices) {
-  device.isActive = false;
+        device.notifiedOffline = true;
 
-  if (!device.notifiedOffline) {
-    const home = await Home.findById(device.home);
+        console.log(`🔔 Push sent: ${device.name} offline`);
+      }
 
-    await sendPushToUsers(
-      home.members,
-      "Device Offline",
-      `${device.name} went offline`
-    );
-
-    device.notifiedOffline = true;
-  }
-
-  await device.save();
-}
-
-    for (const device of offlineDevices) {
-      if (!device.home) continue;
-
-      await sendPushToUsers(
-        device.home.members,
-        "Device Offline",
-        `${device.name} went offline`
-      );
-
-      console.log(`🔔 Push sent: ${device.name} offline`);
+      await device.save();
     }
   } catch (err) {
     console.error("❌ Watchdog error:", err.message);
@@ -222,7 +221,7 @@ export function publishWithAck(topic, payload, cmdId, timeoutMs = 5000) {
 }
 
 /* --------------------------------------------------
-   DEBUG: PENDING COMMAND MONITOR
+   DEBUG MONITOR
 -------------------------------------------------- */
 setInterval(() => {
   if (pendingCommands.size > 0) {
@@ -231,6 +230,6 @@ setInterval(() => {
 }, 5000);
 
 /* --------------------------------------------------
-   EXPORT CLIENT
+   EXPORT
 -------------------------------------------------- */
 export default client;
