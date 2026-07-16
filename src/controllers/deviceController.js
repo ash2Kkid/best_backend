@@ -88,6 +88,7 @@ export const pairRequest = async (req, res) => {
 export const getPendingRequests = async (req, res) => {
   try {
     const devices = await Device.find({ status: "pending" })
+      .populate("requestedBy", "email")
       .select("deviceId name requestedBy createdAt");
 
     res.json(devices);

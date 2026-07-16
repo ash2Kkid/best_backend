@@ -14,6 +14,8 @@ import SensorData from "./models/SensorData.js";
 import homeRoutes from "./routes/homeRoutes.js";
 import roomRoutes from "./routes/roomRoutes.js";
 import adminRoutes from "./routes/adminRoutes.js";
+import sseRoutes from "./routes/sseRoutes.js";
+import notificationRoutes from "./routes/notificationRoutes.js";
 
 
 
@@ -31,6 +33,8 @@ app.use("/data", dataRoutes);
 app.use("/api/homes", homeRoutes);
 app.use("/api/rooms", roomRoutes);
 app.use("/admin", adminRoutes);
+app.use("/api/sse", sseRoutes);
+app.use("/notifications", notificationRoutes);
 
 // DB + MQTT init
 connectDB();
